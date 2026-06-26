@@ -41,7 +41,33 @@ jobs:
             --platform android \
             --profile preview \
             --non-interactive \
-            --output ./luna-connect.apk
+            --json \
+            --no-wait > build-result.json
+          echo "Build submitted. Getting download URL..."
+          cat build-result.json
+
+      - name: Wait for build and download APK
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          BUILD_ID=$(cat build-result.json | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+          echo "Build ID: $BUILD_ID"
+          echo "Waiting for build to complete (this may take 10-15 minutes)..."
+          while true; do
+            STATUS=$(eas build:view $BUILD_ID --json | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+            echo "Status: $STATUS"
+            if [ "$STATUS" = "FINISHED" ]; then
+              URL=$(eas build:view $BUILD_ID --json | grep -o '"artifactUrl":"[^"]*"' | cut -d'"' -f4)
+              echo "Downloading APK from: $URL"
+              curl -L "$URL" -o luna-connect.apk
+              echo "✅ APK downloaded"
+              break
+            elif [ "$STATUS" = "ERRORED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "❌ Build failed with status: $STATUS"
+              exit 1
+            fi
+            sleep 30
+          done
 
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
