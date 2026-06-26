@@ -28,9 +28,10 @@ jobs:
         run: |
           ZIP=$(find . -name "luna-connect.zip" | head -n 1)
           if [ -z "$ZIP" ]; then
-            echo "❌ luna-connect.zip not found"
-            exit 1
+            echo "ℹ️ luna-connect.zip not found. Source code might already be extracted. Skipping extraction step safely..."
+            exit 0
           fi
+          
           echo "✅ Found: $ZIP"
           unzip -o "$ZIP" -d extracted/
           INNER=$(ls extracted/)
@@ -52,6 +53,8 @@ jobs:
           if [ ! -f "package-lock.json" ]; then
             echo "package-lock.json missing. Generating..."
             npm install --package-lock-only
+          else
+            echo "✅ package-lock.json already exists."
           fi
 
       - name: Commit and push extracted source & lockfile to main
@@ -60,7 +63,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --quiet && echo "Nothing to commit" || \
-            git commit -m "chore: extract source and generate lockfile [skip ci]"
+            git commit -m "chore: update source and lockfile [skip ci]"
           git push origin main
 
   build-apk:
@@ -81,10 +84,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm' # Caching is now safely enabled
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci # 'npm ci' is faster and safer for pipelines when a lockfile is present
+        run: npm ci
 
       - name: Install EAS CLI
         run: npm install -g eas-cli
