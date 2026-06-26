@@ -2,6 +2,7 @@
   "expo": {
     "name": "Luna Connect",
     "slug": "luna-connect",
+    "owner": "elite0302",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -33,15 +34,8 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "targetSdkVersion": 34
-          }
-        }
-      ]
-    ]
+    "cli": {
+      "appVersionSource": "local"
+    }
   }
 }
