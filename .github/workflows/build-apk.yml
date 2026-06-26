@@ -33,6 +33,15 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
+      - name: Link project to Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          OWNER=$(eas whoami)
+          echo "Logged in as: $OWNER"
+          npx expo config --type public 2>/dev/null || true
+          eas project:init --force --non-interactive 2>/dev/null || true
+
       - name: Build APK with EAS
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -43,27 +52,28 @@ jobs:
             --non-interactive \
             --json \
             --no-wait > build-result.json
-          echo "Build submitted. Getting download URL..."
+          echo "Build submitted."
           cat build-result.json
 
       - name: Wait for build and download APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          BUILD_ID=$(cat build-result.json | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+          BUILD_ID=$(python3 -c "import json,sys; data=json.load(open('build-result.json')); print(data[0]['id'] if isinstance(data,list) else data['id'])")
           echo "Build ID: $BUILD_ID"
-          echo "Waiting for build to complete (this may take 10-15 minutes)..."
+          echo "Waiting for EAS build to finish..."
           while true; do
-            STATUS=$(eas build:view $BUILD_ID --json | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+            RESULT=$(eas build:view $BUILD_ID --json)
+            STATUS=$(python3 -c "import json,sys; data=json.loads('''$RESULT'''); print(data.get('status',''))" 2>/dev/null || echo "UNKNOWN")
             echo "Status: $STATUS"
             if [ "$STATUS" = "FINISHED" ]; then
-              URL=$(eas build:view $BUILD_ID --json | grep -o '"artifactUrl":"[^"]*"' | cut -d'"' -f4)
+              URL=$(python3 -c "import json,sys; data=json.loads('''$RESULT'''); print(data.get('artifacts',{}).get('buildUrl',''))" 2>/dev/null)
               echo "Downloading APK from: $URL"
               curl -L "$URL" -o luna-connect.apk
               echo "✅ APK downloaded"
               break
             elif [ "$STATUS" = "ERRORED" ] || [ "$STATUS" = "CANCELLED" ]; then
-              echo "❌ Build failed with status: $STATUS"
+              echo "❌ Build failed: $STATUS"
               exit 1
             fi
             sleep 30
