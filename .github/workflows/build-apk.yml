@@ -1,75 +1,18 @@
-name: Luna Connect — Extract, Publish & Build APK
+name: Luna Connect — Build APK
 
 on:
   push:
     branches:
       - main
-    paths:
-      - '**.zip'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  extract-and-publish:
-    name: Extract ZIP & Push Source
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Find and extract luna-connect.zip
-        run: |
-          ZIP=$(find . -name "luna-connect.zip" | head -n 1)
-          if [ -z "$ZIP" ]; then
-            echo "ℹ️ luna-connect.zip not found. Source code might already be extracted. Skipping extraction step safely..."
-            exit 0
-          fi
-          
-          echo "✅ Found: $ZIP"
-          unzip -o "$ZIP" -d extracted/
-          INNER=$(ls extracted/)
-          if [ $(echo "$INNER" | wc -l) -eq 1 ] && [ -d "extracted/$INNER" ]; then
-            cp -r extracted/$INNER/. ./
-          else
-            cp -r extracted/. ./
-          fi
-          rm -rf extracted/
-          rm -f luna-connect.zip
-
-      - name: Set up Node.js (Temporary for generating lockfile)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Generate package-lock.json if missing
-        run: |
-          if [ ! -f "package-lock.json" ]; then
-            echo "package-lock.json missing. Generating..."
-            npm install --package-lock-only
-          else
-            echo "✅ package-lock.json already exists."
-          fi
-
-      - name: Commit and push extracted source & lockfile to main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && echo "Nothing to commit" || \
-            git commit -m "chore: update source and lockfile [skip ci]"
-          git push origin main
-
   build-apk:
     name: Build Android APK via EAS
     runs-on: ubuntu-latest
-    needs: extract-and-publish
     permissions:
       contents: write
 
@@ -77,17 +20,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install EAS CLI
         run: npm install -g eas-cli
